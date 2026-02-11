@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AI Particle Əl</title>
+  <title>AI Əl ilə Particle Effekti</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <canvas id="canvas"></canvas>
 <video id="video" autoplay playsinline muted></video>
 
-<div id="status">Başlanğıc... Model yüklənir (10-60 saniyə çəkə bilər)</div>
+<div id="status">Kamera yüklənir...</div>
 
 <div id="ui">
-  <button id="toggle">Particle Effekt (Aktiv)</button>
-  <button id="clear">Təmizlə</button>
+  <input id="text" placeholder="Mətn yaz (boş qalsa sphere olur)" />
+  <button id="create">Yarat</button>
 </div>
 
 <script type="module" src="script.js"></script>
+
 </body>
 </html>
