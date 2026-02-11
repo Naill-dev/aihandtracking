@@ -13,16 +13,15 @@ canvas.height = window.innerHeight;
 let particles = [];
 let handLandmarker;
 let showParticleHand = true;
-let trailAlpha = 0.08; // trail effekti intensivliyi (daha böyük = daha çox silinmə)
+let trailAlpha = 0.08;
 
-// MediaPipe Hand bağlantıları (21 nöqtə arasındakı xətlər)
 const HAND_CONNECTIONS = [
-  [0, 1], [1, 2], [2, 3], [3, 4],     // baş barmaq
-  [0, 5], [5, 6], [6, 7], [7, 8],     // şəhadət
-  [5, 9], [9, 10], [10, 11], [11, 12], // orta
-  [9, 13], [13, 14], [14, 15], [15, 16], // adsız
-  [13, 17], [17, 18], [18, 19], [19, 20], // çəhrayı
-  [0, 17]  // ovuc əlaqəsi
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  [0, 5], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 12],
+  [9, 13], [13, 14], [14, 15], [15, 16],
+  [13, 17], [17, 18], [18, 19], [19, 20],
+  [0, 17]
 ];
 
 class Particle {
@@ -32,7 +31,7 @@ class Particle {
     this.targetX = targetX;
     this.targetY = targetY;
     this.size = 2.0 + Math.random() * 1.8;
-    this.color = hsl(${Math.random() * 60 + 300}, 100%, 65%); // çəhrayı-bənövşəyi tonlar
+    this.color = hsl(${Math.random() * 60 + 300}, 100%, 65%);
     this.density = 10 + Math.random() * 30;
   }
   update() {
@@ -55,24 +54,30 @@ class Particle {
 
 async function initMediaPipe() {
   try {
-    status.textContent = "MediaPipe model yüklənir...";
+    status.textContent = "MediaPipe model yüklənir... (bu 5-20 saniyə çəkə bilər)";
+    status.style.color = "yellow";
+
     const vision = await FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
     );
+
     handLandmarker = await HandLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-        delegate: "GPU"  // GPU işləmirsə "CPU" yaz
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+        delegate: "GPU"
       },
       runningMode: "VIDEO",
       numHands: 1
     });
-    status.textContent = "Model hazır ✓ Əlinizi göstərin ✋";
+
+    status.textContent = "Model yükləndi ✓ Kamera açılır...";
+    status.style.color = "lime";
     startVideo();
   } catch (err) {
-    console.error(err);
-    status.textContent = "Model yüklənmədi: " + err.message;
+    console.error("MediaPipe xətası:", err);
+    status.textContent = "Model yüklənmədi! Brauzer konsolunu yoxla (F12). Xəta: " + err.message;
     status.style.color = "red";
+    status.style.fontSize = "20px";
   }
 }
 
@@ -82,12 +87,17 @@ async function startVideo() {
       video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     video.srcObject = stream;
-    await video.play();
-    status.textContent = "Kamera aktiv ✓ Əlinizi göstərin";
-    requestAnimationFrame(processVideo);
+    video.onloadedmetadata = async () => {
+      await video.play();
+      status.textContent = "Kamera aktiv ✓ Əlinizi göstərin ✋";
+      status.style.color = "#0f0";
+      requestAnimationFrame(processVideo);
+    };
   } catch (err) {
-    status.textContent = "Kameraya icazə verin!";
+    console.error("Kamera xətası:", err);
+    status.textContent = "Kameraya icazə verilməyib və ya tapılmadı! Brauzer ayarlarını yoxlayın.";
     status.style.color = "orange";
+    status.style.fontSize = "20px";
   }
 }
 
@@ -95,20 +105,16 @@ async function processVideo() {
   if (video.readyState >= video.HAVE_CURRENT_DATA && handLandmarker) {
     const results = await handLandmarker.detectForVideo(video, performance.now());
 
-    // Trail effekti: arxa planı qismən sil
     ctx.fillStyle = rgba(0,0,0,${trailAlpha});
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (results.landmarks?.length > 0 && showParticleHand) {
       const landmarks = results.landmarks[0];
-      
-      // Normalize koordinatları canvas-a çevir (mirror effekti ilə)
       const toPixel = (lm) => ({
         x: (1 - lm.x) * canvas.width,
         y: lm.y * canvas.height
       });
 
-      // Əsas 21 nöqtə üçün particle-lar yarat/yenilə
       if (particles.length < 21) {
         particles = landmarks.map(lm => {
           const pos = toPixel(lm);
@@ -122,11 +128,10 @@ async function processVideo() {
         });
       }
 
-      // Bağlantılar boyunca əlavə particle-lar (fiquru dolğunlaşdırmaq üçün)
       HAND_CONNECTIONS.forEach(([a, b]) => {
         const p1 = toPixel(landmarks[a]);
         const p2 = toPixel(landmarks[b]);
-        const steps = 8; // hər xəttdə neçə particle
+        const steps = 8;
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const ix = p1.x + (p2.x - p1.x) * t;
@@ -139,23 +144,18 @@ async function processVideo() {
         }
       });
 
-      // Əsas particle-ları yenilə və çək
-      particles.forEach(p => {
-        p.update();
-        p.draw();
-      });
+      particles.forEach(p => { p.update(); p.draw(); });
 
       status.textContent = "Əl tapıldı – Particle skelet aktiv ✋";
       status.style.color = "#0f0";
     } else {
-      status.textContent = showParticleHand ? "Əl axtarılır..." : "Particle effekti söndürülüb";
+      status.textContent = showParticleHand ? "Əl axtarılır... (əlinizi göstərin)" : "Particle effekti söndürülüb";
       status.style.color = showParticleHand ? "#f66" : "#aaa";
     }
   }
   requestAnimationFrame(processVideo);
 }
 
-// Düymələr
 toggleBtn.addEventListener('click', () => {
   showParticleHand = !showParticleHand;
   toggleBtn.textContent = showParticleHand ? "Particle Əl Effekti (Aktiv)" : "Particle Əl Effekti (Söndürülüb)";
