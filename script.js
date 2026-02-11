@@ -2,6 +2,8 @@ const canvas = document.getElementById('canvas1');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const videoElement = document.getElementById('input_video');
 const statusText = document.getElementById('status');
+const textInput = document.getElementById('textInput');
+const btn = document.getElementById('btn');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -9,7 +11,7 @@ canvas.height = window.innerHeight;
 let particles = [];
 let handCoords = { x: 0, y: 0, active: false };
 
-// Particle Klası
+// --- Particle Klası ---
 class Particle {
     constructor(x, y) {
         this.x = Math.random() * canvas.width;
@@ -30,28 +32,25 @@ class Particle {
         let dx = handCoords.x - this.x;
         let dy = handCoords.y - this.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
-        let forceDirectionX = dx / distance;
-        let forceDirectionY = dy / distance;
-        let maxDistance = 100;
-        let force = (maxDistance - distance) / maxDistance;
-        let directionX = forceDirectionX * force * this.density;
-        let directionY = forceDirectionY * force * this.density;
-
-        if (distance < maxDistance && handCoords.active) {
-            this.x -= directionX;
-            this.y -= directionY;
+        
+        if (distance < 100 && handCoords.active) {
+            let forceDirectionX = dx / distance;
+            let forceDirectionY = dy / distance;
+            let force = (100 - distance) / 100;
+            this.x -= forceDirectionX * force * this.density;
+            this.y -= forceDirectionY * force * this.density;
         } else {
             if (this.x !== this.baseX) {
-                this.x -= (this.x - this.baseX) / 10;
+                this.x -= (this.x - this.baseX) / 15;
             }
             if (this.y !== this.baseY) {
-                this.y -= (this.y - this.baseY) / 10;
+                this.y -= (this.y - this.baseY) / 15;
             }
         }
     }
 }
 
-// MediaPipe Hands Ayarları
+// --- MediaPipe Hands Setup ---
 const hands = new Hands({
     locateFile: (file) => https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}
 });
@@ -65,19 +64,22 @@ hands.setOptions({
 
 hands.onResults((results) => {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmark = results.multiHandLandmarks[0][8]; // 8 - Şəhadət barmağının ucu
-        handCoords.x = (1 - landmark.x) * canvas.width; // Güzgü effekti üçün (1 - x)
+        // 8 nömrəli nöqtə şəhadət barmağının ucudur
+        const landmark = results.multiHandLandmarks[0][8];
+        handCoords.x = (1 - landmark.x) * canvas.width; // Güzgü əksi üçün
         handCoords.y = landmark.y * canvas.height;
         handCoords.active = true;
+        
         statusText.innerText = "Əl tapıldı ✅";
         statusText.style.color = "#00ff00";
     } else {
         handCoords.active = false;
         statusText.innerText = "Əl axtarılır...";
-        statusText.style.color = "#ff0000";
+        statusText.style.color = "#ff6666";
     }
 });
 
+// --- Kamera İdarəetməsi ---
 const camera = new Camera(videoElement, {
     onFrame: async () => {
         await hands.send({ image: videoElement });
@@ -85,23 +87,36 @@ const camera = new Camera(videoElement, {
     width: 640,
     height: 480
 });
-camera.start();
 
-// Mətn Yaradılması
+// Kameranı başlat və xətaları tut
+camera.start()
+    .then(() => {
+        console.log("Kamera uğurla açıldı");
+        statusText.innerText = "Kamera aktiv. Əlini göstər.";
+    })
+    .catch(err => {
+        console.error("Kamera xətası: ", err);
+        statusText.innerText = "Kamera açılmadı! (Xəta)";
+    });
+
+// --- Funksiyalar ---
 function createText(text) {
     particles = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Mətni müvəqqəti çək
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 100px Arial';
+    ctx.font = 'bold 100px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);
     
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let y = 0; y < data.height; y += 4) {
-        for (let x = 0; x < data.width; x += 4) {
-            if (data.data[(y * 4 * data.width) + (x * 4) + 3] > 128) {
+    for (let y = 0; y < imageData.height; y += 4) {
+        for (let x = 0; x < imageData.width; x += 4) {
+            if (imageData.data[(y * 4 * imageData.width) + (x * 4) + 3] > 128) {
                 particles.push(new Particle(x, y));
             }
         }
@@ -110,28 +125,45 @@ function createText(text) {
 
 function initSphere() {
     particles = [];
-    for(let i=0; i<1500; i++) {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    for(let i=0; i < 1200; i++) {
         let angle = Math.random() * Math.PI * 2;
         let r = Math.random() * 120;
-        let x = canvas.width/2 + Math.cos(angle) * r;
-        let y = canvas.height/2 + Math.sin(angle) * r;
+        let x = centerX + Math.cos(angle) * r;
+        let y = centerY + Math.sin(angle) * r;
         particles.push(new Particle(x, y));
     }
 }
 
 function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    particles.forEach(p => {
-        p.draw();
-        p.update();
-    });
+    for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+    }
     requestAnimationFrame(animate);
 }
 
+// --- Event Listeners ---
+btn.addEventListener('click', () => {
+    if (textInput.value.trim() !== "") {
+        createText(textInput.value);
+    } else {
+        initSphere();
+    }
+});
+
+textInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') btn.click();
+});
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    initSphere();
+});
+
+// Başlat
 initSphere();
 animate();
-
-document.getElementById('btn').onclick = () => {
-    const txt = document.getElementById('textInput').value;
-    if(txt) createText(txt); else initSphere();
-};
