@@ -11,7 +11,7 @@ canvas.height = window.innerHeight;
 let particles = [];
 let handCoords = { x: 0, y: 0, active: false };
 
-// --- Particle Klası ---
+// Particle Klası
 class Particle {
     constructor(x, y) {
         this.x = Math.random() * canvas.width;
@@ -20,7 +20,7 @@ class Particle {
         this.baseY = y;
         this.size = 2;
         this.color = '#ff0000';
-        this.density = (Math.random() * 30) + 2;
+        this.density = (Math.random() * 35) + 5;
     }
     draw() {
         ctx.fillStyle = this.color;
@@ -33,10 +33,10 @@ class Particle {
         let dy = handCoords.y - this.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
         
-        if (distance < 100 && handCoords.active) {
+        if (distance < 120 && handCoords.active) {
             let forceDirectionX = dx / distance;
             let forceDirectionY = dy / distance;
-            let force = (100 - distance) / 100;
+            let force = (120 - distance) / 120;
             this.x -= forceDirectionX * force * this.density;
             this.y -= forceDirectionY * force * this.density;
         } else {
@@ -50,9 +50,11 @@ class Particle {
     }
 }
 
-// --- MediaPipe Hands Setup ---
+// MediaPipe Hands obyektini yaradırıq
 const hands = new Hands({
-    locateFile: (file) => https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}
+    locateFile: (file) => {
+        return https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file};
+    }
 });
 
 hands.setOptions({
@@ -64,12 +66,10 @@ hands.setOptions({
 
 hands.onResults((results) => {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        // 8 nömrəli nöqtə şəhadət barmağının ucudur
-        const landmark = results.multiHandLandmarks[0][8];
-        handCoords.x = (1 - landmark.x) * canvas.width; // Güzgü əksi üçün
+        const landmark = results.multiHandLandmarks[0][8]; // Şəhadət barmağı
+        handCoords.x = (1 - landmark.x) * canvas.width;
         handCoords.y = landmark.y * canvas.height;
         handCoords.active = true;
-        
         statusText.innerText = "Əl tapıldı ✅";
         statusText.style.color = "#00ff00";
     } else {
@@ -79,32 +79,27 @@ hands.onResults((results) => {
     }
 });
 
-// --- Kamera İdarəetməsi ---
-const camera = new Camera(videoElement, {
-    onFrame: async () => {
-        await hands.send({ image: videoElement });
-    },
-    width: 640,
-    height: 480
-});
+// Kameranı işə salmaq üçün daha stabil funksiya
+async function startCamera() {
+    try {
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+        await camera.start();
+        console.log("Kamera aktivdir.");
+    } catch (error) {
+        console.error("Kamera xətası:", error);
+        statusText.innerText = "Kamera bloklanıb və ya tapılmadı!";
+    }
+}
 
-// Kameranı başlat və xətaları tut
-camera.start()
-    .then(() => {
-        console.log("Kamera uğurla açıldı");
-        statusText.innerText = "Kamera aktiv. Əlini göstər.";
-    })
-    .catch(err => {
-        console.error("Kamera xətası: ", err);
-        statusText.innerText = "Kamera açılmadı! (Xəta)";
-    });
-
-// --- Funksiyalar ---
 function createText(text) {
     particles = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Mətni müvəqqəti çək
     ctx.fillStyle = 'white';
     ctx.font = 'bold 100px sans-serif';
     ctx.textAlign = 'center';
@@ -127,7 +122,7 @@ function initSphere() {
     particles = [];
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    for(let i=0; i < 1200; i++) {
+    for(let i=0; i < 1500; i++) {
         let angle = Math.random() * Math.PI * 2;
         let r = Math.random() * 120;
         let x = centerX + Math.cos(angle) * r;
@@ -145,25 +140,19 @@ function animate() {
     requestAnimationFrame(animate);
 }
 
-// --- Event Listeners ---
-btn.addEventListener('click', () => {
-    if (textInput.value.trim() !== "") {
-        createText(textInput.value);
-    } else {
-        initSphere();
-    }
-});
+// Event Listeners
+btn.onclick = () => {
+    if (textInput.value.trim() !== "") createText(textInput.value);
+    else initSphere();
+};
 
-textInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') btn.click();
-});
-
-window.addEventListener('resize', () => {
+window.onresize = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     initSphere();
-});
+};
 
-// Başlat
+// İşə sal
 initSphere();
 animate();
+startCamera(); // Ən sonda kameranı çağırırıq
