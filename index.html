@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Particle Hand Tracking</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+</head>
+<body>
+    <video id="input_video" style="display:none;"></video>
+    
+    <canvas id="canvas1"></canvas>
+
+    <div class="ui-container">
+        <input type="text" id="textInput" placeholder="Söz yazın..." maxlength="12">
+        <button id="btn">Davam Et</button>
+        <span id="status" style="color: #ff0000; margin-left: 10px; font-size: 12px;">Kamera yüklənir...</span>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
