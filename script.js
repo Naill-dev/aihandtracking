@@ -11,16 +11,15 @@ canvas.height = window.innerHeight;
 let particles = [];
 let handCoords = { x: 0, y: 0, active: false };
 
-// Particle Klası
 class Particle {
     constructor(x, y) {
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
         this.baseX = x;
         this.baseY = y;
-        this.size = 2;
-        this.color = '#ff0000';
-        this.density = (Math.random() * 35) + 5;
+        this.size = 2.5;
+        this.color = '#ff3366';
+        this.density = (Math.random() * 30) + 8;
     }
     draw() {
         ctx.fillStyle = this.color;
@@ -31,87 +30,96 @@ class Particle {
     update() {
         let dx = handCoords.x - this.x;
         let dy = handCoords.y - this.y;
-        let distance = Math.sqrt(dx * dx + dy * dy);
+        let distance = Math.hypot(dx, dy);
         
-        if (distance < 120 && handCoords.active) {
-            let forceDirectionX = dx / distance;
-            let forceDirectionY = dy / distance;
-            let force = (120 - distance) / 120;
-            this.x -= forceDirectionX * force * this.density;
-            this.y -= forceDirectionY * force * this.density;
+        if (distance < 130 && handCoords.active) {
+            let force = (130 - distance) / 130;
+            let forceX = dx / distance * force * this.density;
+            let forceY = dy / distance * force * this.density;
+            this.x -= forceX;
+            this.y -= forceY;
         } else {
-            if (this.x !== this.baseX) {
-                this.x -= (this.x - this.baseX) / 15;
-            }
-            if (this.y !== this.baseY) {
-                this.y -= (this.y - this.baseY) / 15;
-            }
+            this.x += (this.baseX - this.x) * 0.08;
+            this.y += (this.baseY - this.y) * 0.08;
         }
     }
 }
 
-// MediaPipe Hands obyektini yaradırıq
+// MediaPipe Hands
 const hands = new Hands({
-    locateFile: (file) => {
-        return https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file};
-    }
+    locateFile: (file) => https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}
 });
 
 hands.setOptions({
     maxNumHands: 1,
     modelComplexity: 1,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
 });
 
 hands.onResults((results) => {
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmark = results.multiHandLandmarks[0][8]; // Şəhadət barmağı
-        handCoords.x = (1 - landmark.x) * canvas.width;
-        handCoords.y = landmark.y * canvas.height;
+    if (results.multiHandLandmarks?.length > 0) {
+        const lm = results.multiHandLandmarks[0][8]; // şəhadət barmağı ucu
+        handCoords.x = (1 - lm.x) * canvas.width;   // mirror effekti
+        handCoords.y = lm.y * canvas.height;
         handCoords.active = true;
-        statusText.innerText = "Əl tapıldı ✅";
-        statusText.style.color = "#00ff00";
+        statusText.textContent = "Əl tapıldı ✓";
+        statusText.style.color = "#0f0";
     } else {
         handCoords.active = false;
-        statusText.innerText = "Əl axtarılır...";
-        statusText.style.color = "#ff6666";
+        statusText.textContent = "Əl axtarılır...";
+        statusText.style.color = "#f66";
     }
 });
 
-// Kameranı işə salmaq üçün daha stabil funksiya
+// Kamera başlatma (manual + stabil)
 async function startCamera() {
     try {
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: "user"
+            }
         });
-        await camera.start();
-        console.log("Kamera aktivdir.");
-    } catch (error) {
-        console.error("Kamera xətası:", error);
-        statusText.innerText = "Kamera bloklanıb və ya tapılmadı!";
+        videoElement.srcObject = stream;
+        await videoElement.play();
+        console.log("Kamera aktiv");
+        statusText.textContent = "Kamera aktiv ✓";
+        statusText.style.color = "#0f0";
+        sendFrame(); // frame göndərməyə başla
+    } catch (err) {
+        console.error("Kamera xətası:", err);
+        statusText.textContent = "Kamera açılmadı! İcazə verin.";
+        statusText.style.color = "#f44";
     }
+}
+
+function sendFrame() {
+    if (videoElement.readyState >= videoElement.HAVE_CURRENT_DATA) {
+        hands.send({ image: videoElement });
+    }
+    requestAnimationFrame(sendFrame);
 }
 
 function createText(text) {
     particles = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 100px sans-serif';
+    ctx.font = 'bold 120px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    ctx.fillText(text, canvas.width/2, canvas.height/2);
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let y = 0; y < imageData.height; y += 4) {
-        for (let x = 0; x < imageData.width; x += 4) {
-            if (imageData.data[(y * 4 * imageData.width) + (x * 4) + 3] > 128) {
+    const step = 4;
+    for (let y = 0; y < imageData.height; y += step) {
+        for (let x = 0; x < imageData.width; x += step) {
+            const i = (y * imageData.width + x) * 4;
+            if (imageData.data[i + 3] > 100) {
                 particles.push(new Particle(x, y));
             }
         }
@@ -120,39 +128,44 @@ function createText(text) {
 
 function initSphere() {
     particles = [];
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    for(let i=0; i < 1500; i++) {
-        let angle = Math.random() * Math.PI * 2;
-        let r = Math.random() * 120;
-        let x = centerX + Math.cos(angle) * r;
-        let y = centerY + Math.sin(angle) * r;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const count = 1800;
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const r = 80 + Math.random() * 100;
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
         particles.push(new Particle(x, y));
     }
 }
 
 function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < particles.length; i++) {
-        particles[i].update();
-        particles[i].draw();
-    }
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    particles.forEach(p => {
+        p.update();
+        p.draw();
+    });
+    
     requestAnimationFrame(animate);
 }
 
-// Event Listeners
-btn.onclick = () => {
-    if (textInput.value.trim() !== "") createText(textInput.value);
+// Eventlər
+btn.addEventListener('click', () => {
+    const val = textInput.value.trim();
+    if (val) createText(val);
     else initSphere();
-};
+});
 
-window.onresize = () => {
+window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     initSphere();
-};
+});
 
-// İşə sal
+// Başlanğıc
 initSphere();
 animate();
-startCamera(); // Ən sonda kameranı çağırırıq
+startCamera();
