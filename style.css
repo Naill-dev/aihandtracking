@@ -23,7 +23,8 @@ video {
   left: 15px;
   font-size: 22px;
   z-index: 10;
-  text-shadow: 0 0 5px black;
+  text-shadow: 0 0 6px black;
+  transition: color 0.4s;
 }
 
 #ui {
@@ -31,33 +32,37 @@ video {
   bottom: 25px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0,0,0,0.65);
-  padding: 18px 35px;
+  background: rgba(0,0,0,0.7);
+  padding: 18px 40px;
   border-radius: 15px;
   z-index: 10;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.7);
 }
 
-input, button {
-  padding: 12px 18px;
+#ui button {
+  padding: 12px 24px;
   font-size: 17px;
   border: none;
-  border-radius: 8px;
-  margin: 0 8px;
-}
-
-input {
-  width: 280px;
-  background: #222;
-  color: white;
-}
-
-button {
-  background: #ff3366;
-  color: white;
+  border-radius: 10px;
+  margin: 0 12px;
   cursor: pointer;
+  transition: all 0.3s;
 }
 
-button:hover {
-  background: #ff5599;
+#toggle {
+  background: #3366ff;
+  color: white;
+}
+
+#toggle:hover {
+  background: #5588ff;
+}
+
+#clear {
+  background: #ff4444;
+  color: white;
+}
+
+#clear:hover {
+  background: #ff6666;
 }
